@@ -210,16 +210,74 @@
 
 
 
-    <!-- Audio Control -->
-    <div class="fixed top-6 right-6 z-50 flex items-center gap-3">
-        <div id="music-label" class="hidden md:block px-3 py-1.5 bg-white/90 backdrop-blur-md border border-gold-200 rounded-full text-[10px] tracking-widest uppercase font-medium text-gold-700 shadow-sm transition-all opacity-0 translate-x-2 pointer-events-none">
-            Kau Selalu Dihati
+    <!-- Audio Control (Floating Draggable Music Bar) -->
+    <div id="music-bar" class="fixed bottom-6 left-1/2 z-50 flex items-center gap-3 px-4 py-2.5 bg-stone-900/80 backdrop-blur-md border border-gold-500/30 rounded-full shadow-2xl transition-all duration-300 translate-y-[200%] opacity-0 cursor-grab max-w-[90vw] touch-none select-none overflow-hidden" style="transform: translate(-50%, 200%);">
+        
+        <!-- Album Art / Play Icon -->
+        <div class="relative w-8 h-8 rounded-full bg-gradient-to-tr from-gold-600 to-gold-300 flex items-center justify-center shrink-0 border border-gold-200 shadow-sm overflow-hidden pointer-events-none">
+            <iconify-icon id="bar-icon" icon="lucide:disc-3" width="16" class="text-stone-900 animate-spin-slow"></iconify-icon>
         </div>
-        <button id="music-btn" class="relative w-12 h-12 flex items-center justify-center rounded-full bg-white/90 backdrop-blur-md border-2 border-gold-300 text-gold-600 shadow-lg shadow-gold-500/20 transition-all hover:scale-105 hover:border-gold-500 group" aria-label="Toggle Music">
-            <div id="music-pulse" class="absolute inset-0 rounded-full border border-gold-400 animate-ping opacity-75 hidden"></div>
-            <iconify-icon icon="lucide:music" width="20" stroke-width="1.5" class="group-hover:rotate-12 transition-transform"></iconify-icon>
-        </button>
+
+        <!-- Info & Visualizer (Collapsible) -->
+        <div id="music-info" class="flex flex-col items-start pr-2 pointer-events-none transition-all duration-300 overflow-hidden w-auto opacity-100">
+            <!-- Running Text -->
+            <div class="w-24 md:w-32 overflow-hidden whitespace-nowrap mask-linear-fade">
+                <p id="song-title" class="text-[10px] text-white font-medium tracking-wide animate-marquee inline-block">
+                    Kau Selalu Dihati &bull; Indri & Bayu Wedding
+                </p>
+            </div>
+            
+            <!-- Mini Visualizer -->
+            <div id="bar-visualizer" class="flex items-end gap-[2px] h-3 hidden">
+                <div class="w-[2px] bg-gold-400 rounded-full visualizer-bar"></div>
+                <div class="w-[2px] bg-gold-400 rounded-full visualizer-bar"></div>
+                <div class="w-[2px] bg-gold-400 rounded-full visualizer-bar"></div>
+                <div class="w-[2px] bg-gold-400 rounded-full visualizer-bar"></div>
+            </div>
+            <p id="bar-status" class="text-[8px] text-gold-300 uppercase tracking-widest leading-none mt-0.5">Paused</p>
+        </div>
+
+        <!-- Controls Group -->
+         <div class="flex items-center gap-2">
+             <!-- Toggle Button -->
+             <button id="music-toggle-btn" class="w-7 h-7 flex items-center justify-center rounded-full bg-white/10 hover:bg-white/20 transition-colors text-gold-200 pointer-events-auto">
+                 <iconify-icon id="toggle-icon" icon="lucide:play" width="12" class="ml-0.5"></iconify-icon>
+             </button>
+             
+             <!-- Minimize Button -->
+             <button id="minimize-btn" class="w-5 h-5 flex items-center justify-center rounded-full bg-transparent hover:bg-white/10 transition-colors text-stone-400 hover:text-white pointer-events-auto">
+                 <iconify-icon id="minimize-icon" icon="lucide:chevron-left" width="14"></iconify-icon>
+             </button>
+         </div>
     </div>
+
+    <!-- Additional Style for Marquee & Mask -->
+    <style>
+        .animate-marquee {
+            animation: marquee 8s linear infinite;
+        }
+        @keyframes marquee {
+            0% { transform: translateX(0); }
+            100% { transform: translateX(-100%); }
+        }
+        .animate-spin-slow {
+            animation: spin 3s linear infinite;
+        }
+        
+        /* Visualizer Animation */
+        .visualizer-bar {
+            animation: bounce 0.5s ease infinite alternate;
+        }
+        .visualizer-bar:nth-child(1) { animation-delay: 0s; }
+        .visualizer-bar:nth-child(2) { animation-delay: 0.2s; }
+        .visualizer-bar:nth-child(3) { animation-delay: 0.4s; }
+        .visualizer-bar:nth-child(4) { animation-delay: 0.1s; }
+        
+        @keyframes bounce {
+            0% { height: 4px; }
+            100% { height: 16px; }
+        }
+    </style>
     <!-- Ganti src di bawah ini dengan file MP3 Gamelan/Gending Jawa pilihan Anda -->
     <audio id="bg-music" loop>
         <source src="assets/audio/kau%20selalu%20dihati.mp3" type="audio/mpeg">
@@ -689,12 +747,163 @@
             });
         }
 
-        // Music Toggle Logic
-        const musicBtn = document.getElementById('music-btn');
-        const musicLabel = document.getElementById('music-label');
-        const musicPulse = document.getElementById('music-pulse');
+        // Music Toggle Logic (Floating Bar)
+        const musicBar = document.getElementById('music-bar');
+        const musicInfo = document.getElementById('music-info');
+        const musicBarIcon = document.getElementById('bar-icon');
+        const toggleIcon = document.getElementById('toggle-icon');
+        const minimizeBtn = document.getElementById('minimize-btn');
+        const minimizeIcon = document.getElementById('minimize-icon');
+        const barVisualizer = document.getElementById('bar-visualizer');
+        const barStatus = document.getElementById('bar-status');
         const bgMusic = document.getElementById('bg-music');
+        const musicToggleBtn = document.getElementById('music-toggle-btn');
         
+        let isMinimized = false;
+
+        // Draggable Logic
+        let isDragging = false;
+        let currentX;
+        let currentY;
+        let initialX;
+        let initialY;
+        let xOffset = 0;
+        let yOffset = 0;
+
+        // Constraint variables
+        let minX, maxX, minY, maxY;
+
+        musicBar.addEventListener("mousedown", dragStart);
+        musicBar.addEventListener("touchstart", dragStart, {passive: false});
+
+        document.addEventListener("mouseup", dragEnd);
+        document.addEventListener("touchend", dragEnd);
+
+        document.addEventListener("mousemove", drag);
+        document.addEventListener("touchmove", drag, {passive: false});
+
+        function dragStart(e) {
+            // Prevent dragging if clicking on buttons
+            if (e.target.closest('button')) return;
+
+            if (e.type === "touchstart") {
+                initialX = e.touches[0].clientX - xOffset;
+                initialY = e.touches[0].clientY - yOffset;
+            } else {
+                initialX = e.clientX - xOffset;
+                initialY = e.clientY - yOffset;
+            }
+
+            if (e.target === musicBar || musicBar.contains(e.target)) {
+                isDragging = true;
+                musicBar.classList.replace('cursor-grab', 'cursor-grabbing');
+                
+                // Disable transition during drag to prevent lag
+                musicBar.style.transition = 'none';
+
+                // Pre-calculate constraints to avoid reflows during drag
+                const rect = musicBar.getBoundingClientRect();
+                const viewportWidth = window.innerWidth;
+                const viewportHeight = window.innerHeight;
+                const halfWidth = rect.width / 2;
+                
+                // X constraints (Center based)
+                // Left limit: (VP/2 + X) - HW >= 10  => X >= 10 + HW - VP/2
+                minX = 10 + halfWidth - (viewportWidth / 2);
+                
+                // Right limit: (VP/2 + X) + HW <= VP - 10 => X <= VP - 10 - HW - VP/2
+                maxX = (viewportWidth - 10) - halfWidth - (viewportWidth / 2);
+
+                // Y constraints (Bottom aligned)
+                // Top limit: VP - 24 + Y - H >= 10 => Y >= 10 - VP + 24 + H
+                minY = 34 + rect.height - viewportHeight;
+                
+                // Bottom limit: VP - 24 + Y <= VP - 10 => Y <= 14
+                maxY = 14;
+            }
+        }
+
+        function dragEnd(e) {
+            initialX = currentX;
+            initialY = currentY;
+
+            isDragging = false;
+            musicBar.classList.replace('cursor-grabbing', 'cursor-grab');
+            
+            // Re-enable transition smoothly
+            requestAnimationFrame(() => {
+                musicBar.style.transition = 'all 0.3s ease';
+            });
+        }
+
+        function drag(e) {
+            if (isDragging) {
+                e.preventDefault(); // Keep this to prevent scrolling on touch
+                
+                let clientX, clientY;
+                if (e.type === "touchmove") {
+                    clientX = e.touches[0].clientX;
+                    clientY = e.touches[0].clientY;
+                } else {
+                    clientX = e.clientX;
+                    clientY = e.clientY;
+                }
+
+                let x = clientX - initialX;
+                let y = clientY - initialY;
+
+                // Simple optimized clamping
+                if (x < minX) x = minX;
+                if (x > maxX) x = maxX;
+                if (y < minY) y = minY;
+                if (y > maxY) y = maxY;
+                
+                currentX = x;
+                currentY = y;
+
+                xOffset = currentX;
+                yOffset = currentY;
+
+                // Use requestAnimationFrame for smoother visual updates if needed, 
+                // but direct transform is usually fine for simple specific elements.
+                setTranslate(currentX, currentY, musicBar);
+            }
+        }
+
+        function setTranslate(xPos, yPos, el) {
+            el.style.transform = `translate(calc(-50% + ${xPos}px), ${yPos}px)`;
+        }
+        
+        // Minimize Logic
+        minimizeBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            isMinimized = !isMinimized;
+            
+            if (isMinimized) {
+                // Collapse
+                musicInfo.classList.add('w-0', 'opacity-0', 'pr-0'); // Add w-0 to collapse width
+                musicInfo.classList.remove('pr-2'); // Remove padding
+                
+                // Change icon to Right (Expand)
+                minimizeIcon.setAttribute('icon', 'lucide:chevron-right');
+            } else {
+                // Expand
+                musicInfo.classList.remove('w-0', 'opacity-0', 'pr-0');
+                musicInfo.classList.add('pr-2');
+                
+                // Change icon to Left (Minimize)
+                minimizeIcon.setAttribute('icon', 'lucide:chevron-left');
+            }
+        });
+
+        // Show Bar Animation Logic
+        // We need to handle the initial transform separately from the drag transform
+        // Initial state is translate(-50%, 200%). When active, it should be translate(-50%, 0).
+        // Since we are using manual transform for drag, we'll initialize offsets to match desired start position?
+        // Actually simplest way: Let CSS handle entrance. Once entrance is done, we TAKE OVER with JS.
+        
+        let isBarVisible = false;
+
         // Skip first 11 seconds
         bgMusic.addEventListener('loadedmetadata', function() {
             this.currentTime = 11;
@@ -705,8 +914,22 @@
 
         function toggleMusicState(play) {
             isPlaying = play;
+            
+            // Show Bar when interacting (Entrance)
+            if (!isBarVisible) {
+                musicBar.classList.remove('translate-y-[200%]', 'opacity-0');
+                // Reset transform to default center (handled by CSS class removal) usually, 
+                // but we have inline style="transform: translate(-50%, 200%);" in new HTML?
+                // Wait, in new HTML I added style="transform: translate(-50%, 200%);".
+                // So removing class translate-y-[200%] won't help if inline style is there.
+                
+                // Let's reset inline transform to just center 
+                musicBar.style.transform = "translate(-50%, 0)";
+                isBarVisible = true;
+            }
+
             if (isPlaying) {
-                // Fade In Logic
+                // Play
                 bgMusic.volume = 0;
                 bgMusic.play().catch(e => console.log("Audio play failed"));
                 
@@ -715,31 +938,46 @@
                 let vol = 0;
                 fadeInterval = setInterval(() => {
                     if (vol < 1) {
-                        vol += 0.05; // Increases volume by 5% every 100ms
+                        vol += 0.05;
                         if (vol > 1) vol = 1;
                         bgMusic.volume = vol;
                     } else {
                         clearInterval(fadeInterval);
                     }
-                }, 100); // ~2 seconds fade in
+                }, 100);
 
-                musicBtn.innerHTML = '<iconify-icon icon="lucide:disc-3" width="24" stroke-width="1.5" class="animate-spin-slow"></iconify-icon>';
-                musicBtn.classList.add('border-gold-500', 'text-gold-700');
-                musicLabel.classList.remove('opacity-0', 'translate-x-2');
-                musicPulse.classList.remove('hidden');
-                setTimeout(() => musicLabel.classList.add('opacity-0', 'translate-x-2'), 3000); // Hide label after 3s
+                // UI Updates for Bar
+                toggleIcon.setAttribute('icon', 'lucide:pause');
+                musicBarIcon.classList.add('animate-spin-slow');
+                barVisualizer.classList.remove('hidden');
+                barStatus.innerText = "Now Playing";
+                barStatus.classList.add('text-green-400');
+                barStatus.classList.remove('text-gold-300');
+
             } else {
+                // Pause
                 if (fadeInterval) clearInterval(fadeInterval);
                 bgMusic.pause();
-                musicBtn.innerHTML = '<iconify-icon icon="lucide:music" width="20" stroke-width="1.5"></iconify-icon>';
-                musicBtn.classList.remove('border-gold-500', 'text-gold-700');
-                musicPulse.classList.add('hidden');
+                
+                // UI Updates for Bar
+                toggleIcon.setAttribute('icon', 'lucide:play');
+                musicBarIcon.classList.remove('animate-spin-slow');
+                barVisualizer.classList.add('hidden');
+                barStatus.innerText = "Paused";
+                barStatus.classList.remove('text-green-400');
+                barStatus.classList.add('text-gold-300');
             }
         }
 
-        musicBtn.addEventListener('click', () => {
+        // Toggle Button Click
+        musicToggleBtn.addEventListener('click', (e) => {
+            e.stopPropagation(); // Prevent drag start check on click
             toggleMusicState(!isPlaying);
         });
+        
+        // Also allow clicking the bar body to Play ONLY if not dragging? 
+        // User asked for drag, usually standard behavior is buttons do actions, body grabs.
+        // Let's stick to button for toggle. But maybe open full player? N/A here.
 
         // Auto play music on first interaction (browser policy)
         document.body.addEventListener('click', function() {
