@@ -169,6 +169,19 @@
             opacity: 1;
             transform: translateY(0);
         }
+
+        /* Blur In Animation for Holy Verses */
+        .blur-in {
+            opacity: 0;
+            filter: blur(10px);
+            transform: scale(0.95);
+            transition: all 1.5s cubic-bezier(0.2, 1, 0.3, 1);
+        }
+        .blur-in.in-view {
+            opacity: 1;
+            filter: blur(0);
+            transform: scale(1);
+        }
     </style>
 </head>
 <body class="relative selection:bg-stone-200 selection:text-stone-900 overflow-hidden">
@@ -255,10 +268,10 @@
     </section>
 
     <!-- Main Container with subtle Batik Pattern -->
-    <div class="bg-[#fafaf9] relative -mt-1 z-30">
+    <div class="bg-[#fafaf9] batik-pattern relative -mt-1 z-30">
         
         <!-- Spacer -->
-        <div class="h-12"></div>
+        <div clabg-[#fafaf9] relative -mt-1 z-30
 
         <!-- Mempelai Section -->
         <section id="mempelai" class="py-24 px-6 md:px-12 max-w-5xl mx-auto relative z-10">
@@ -334,15 +347,19 @@
             <div class="absolute inset-0 bg-stone-900/70 transition-opacity duration-700 group-hover:bg-stone-900/60"></div>
             
             <!-- Content -->
-            <div class="relative z-10 max-w-3xl mx-auto px-6 text-center text-white fade-in-up">
+            <div class="relative z-10 max-w-3xl mx-auto px-6 text-center text-white">
                 <!-- Bismillah Calligraphy -->
-                <img src="https://upload.wikimedia.org/wikipedia/commons/2/27/Basmala.svg" alt="Bismillah" class="h-16 md:h-20 mx-auto mb-8 invert opacity-90 filter drop-shadow-lg">
+                <div class="blur-in delay-100">
+                    <img src="https://upload.wikimedia.org/wikipedia/commons/2/27/Basmala.svg" alt="Bismillah" class="h-16 md:h-20 mx-auto mb-8 invert opacity-90 filter drop-shadow-lg">
+                </div>
                 
-                <p class="text-lg md:text-2xl font-serif italic leading-relaxed mb-8 text-gold-100 drop-shadow-md">
-                    "Dan di antara tanda-tanda (kebesaran)-Nya ialah Dia menciptakan pasangan-pasangan untukmu dari jenismu sendiri agar kamu merasa tenteram kepadanya, dan Dia menjadikan di antaramu rasa kasih dan sayang"
-                </p>
+                <div class="blur-in delay-300">
+                    <p class="text-lg md:text-2xl font-serif italic leading-relaxed mb-8 text-gold-100 drop-shadow-md">
+                        "Dan di antara tanda-tanda (kebesaran)-Nya ialah Dia menciptakan pasangan-pasangan untukmu dari jenismu sendiri agar kamu merasa tenteram kepadanya, dan Dia menjadikan di antaramu rasa kasih dan sayang"
+                    </p>
+                </div>
                 
-                <div class="flex items-center justify-center gap-4">
+                <div class="flex items-center justify-center gap-4 blur-in delay-500">
                     <span class="h-px w-12 bg-gold-400"></span>
                     <p class="text-sm tracking-[0.2em] uppercase text-gold-300 font-medium">
                         Q.S Ar-Rum : 21
@@ -767,19 +784,39 @@
             }
         });
 
-        // Intersection Observer for Fade In Animations
+        // Intersection Observer for Fade In, Reveal, and Blur Animations
         const observer = new IntersectionObserver((entries) => {
             entries.forEach(entry => {
                 if (entry.isIntersecting) {
-                    entry.target.style.animationPlayState = 'running';
+                    // Handle CSS Animation (fade-in-up)
+                    if (entry.target.classList.contains('fade-in-up')) {
+                        entry.target.style.animationPlayState = 'running';
+                    }
+                    // Handle Staggered Reveal
+                    if (entry.target.classList.contains('reveal-text')) {
+                        entry.target.classList.add('reveal-visible');
+                    }
+                    // Handle Blur In
+                    if (entry.target.classList.contains('blur-in')) {
+                        entry.target.classList.add('in-view');
+                    }
                     observer.unobserve(entry.target);
                 }
             });
-        });
+        }, { threshold: 0.15 });
 
+        // Observe elements
         document.querySelectorAll('.fade-in-up').forEach(el => {
             el.style.animationPlayState = 'paused';
             observer.observe(el);
+        });
+
+        document.querySelectorAll('.reveal-text').forEach(el => {
+            observer.observe(el);
+        });
+        
+        document.querySelectorAll('.blur-in').forEach(el => {
+             observer.observe(el);
         });
 
         // Falling Petals Logic
